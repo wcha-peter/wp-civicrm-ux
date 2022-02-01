@@ -146,6 +146,13 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 
 					if ( ( $field['data_type'] == 'Date' ) || ( $field['data_type'] == 'Timestamp' ) ) {
 						$output = isset( $match['format'] ) ? strftime( $match['format'], strtotime( $output ) ) : CRM_Utils_Date::customFormat( $output );
+					} elseif ( ( $field['data_type'] == 'String' ) || ( $field['data_type'] == 'Text' ) ) {
+						if ( isset( $match['format'] ) ) {
+							$length = (int) $match['format'];
+							if ( strlen($output) > $length ) {
+								$output = substr( $output, 0, $length) . '...';
+							}
+						}
 					} elseif ( $field['fk_entity'] == 'File' ) {
 						$output = Civicrm_Ux::in_basepage( function () use ( $output ) {
 							return htmlentities( civicrm_api3( 'Attachment', 'getvalue', [
