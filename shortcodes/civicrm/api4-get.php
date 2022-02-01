@@ -71,6 +71,14 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 					}
 					$params['orderBy'][ $sort ] = $dir;
 					break;
+				case 'join':
+					[ $join_entity, $alias, $join_type, $left_field, $condition, $right_field ] = explode( ':', $v, 6);
+					$params['join'][] = [
+						$join_entity . ' AS ' . $alias,
+						$join_type,
+						[$left_field, $condition, $right_field],
+					];
+					break;
 				default:
 					[ $op, $value ] = explode( ':', $v, 2 );
 					if ( ! $value ) {
