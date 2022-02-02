@@ -103,7 +103,10 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 		$output_regex = '/ (?: ( \[ ) | ( {{ ) ) api4: (?<field> [^][[:space:]:{}]+ (?::(?:label|value|name|id))?) (?: : (?<format> [^][{}]+ ) )? (?(1) \] | }} ) /sx';
 
 		if ( preg_match_all( $output_regex, $content, $match ) ) {
-			$params['select'] = array_values( $match['field'] );
+			$params['select'] = array();
+			foreach ( $match['field'] as $field ) {
+				$params['select'] = array_merge($params['select'], explode( '|',  $field));
+			}
 		}
 
 		$params = apply_filters( $this->get_shortcode_name() . '/params', $params, $atts );
