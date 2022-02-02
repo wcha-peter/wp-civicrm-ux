@@ -139,11 +139,20 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 
 			foreach ( $results as $result ) {
 				$output = preg_replace_callback( $output_regex, function ( $match ) use ( $result, $fields ) {
-					$output = $result[ $match['field'] ] ?? '';
+					
+					$field_array = explode( '|',  $match['field']);
 
-					if ( ! $output ) {
-						return '';
-					}
+                    while ( ! $output ) {
+                        if ( count( $field_array ) < 1) {
+                            return '';
+                        }
+                        $current = array_shift( $field_array );
+                        if ( $result[$current] ) {
+                            $output = $result[$current];
+                        }
+                    }
+
+                    $match['field'] = $current;
 
 					$field = $fields[ $match['field'] ] ?? [];
 
