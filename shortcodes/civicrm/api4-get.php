@@ -71,13 +71,6 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 					}
 					$params['orderBy'][ $sort ] = $dir;
 					break;
-				case 'json':
-					$unescaped = str_replace(array('&#91','&#93', '&quot', '&#34', '&#39'), array('[',']','"','"',"'"), $v);
-					$json_array = json_decode($unescaped, true);
-					foreach ( $json_array as $json_key => $json_value ) {
-						$params[$json_key] = $json_value;
-					}
-					break;
 				default:
 					[ $op, $value ] = explode( ':', $v, 2 );
 					if ( ! $value ) {
@@ -107,13 +100,10 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 
 		$match = [];
 
-		$output_regex = '/ (?: ( \[ ) | ( {{ ) | ( \|\| ) ) api4: (?<field> [^][[:space:]:{}]+ (?::(?:label|value|name|id))?) (?: : (?<format> [^][{}]+ ) )? (?(1) \] | (?(2) (?: }}) | (?: \|\|) ) ) /sx';
+		$output_regex = '/ (?: ( \[ ) | ( {{ ) ) api4: (?<field> [^][[:space:]:{}]+ (?::(?:label|value|name|id))?) (?: : (?<format> [^][{}]+ ) )? (?(1) \] | }} ) /sx';
 
 		if ( preg_match_all( $output_regex, $content, $match ) ) {
-			$params['select'] = array();
-			foreach ( $match['field'] as $field ) {
-				$params['select'] = array_merge($params['select'], explode( '|',  $field));
-			}
+			$params['select'] = array_values( $match['field'] );
 		}
 
 		$params = apply_filters( $this->get_shortcode_name() . '/params', $params, $atts );
@@ -154,35 +144,16 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 
 			foreach ( $results as $result ) {
 				$output = preg_replace_callback( $output_regex, function ( $match ) use ( $result, $fields ) {
-					
-					$field_array = explode( '|',  $match['field']);
+					$output = $result[ $match['field'] ] ?? '';
 
-                    while ( ! $output ) {
-                        if ( 1 > count( $field_array ) ) {
-                            return '';
-                        }
-                        $current = array_shift( $field_array );
-                        if ( $result[$current] ) {
-                            $output = $result[$current];
-                        }
-                    }
-
-                    $match['field'] = $current;
+					if ( ! $output ) {
+						return '';
+					}
 
 					$field = $fields[ $match['field'] ] ?? [];
 
 					if ( ( $field['data_type'] == 'Date' ) || ( $field['data_type'] == 'Timestamp' ) ) {
 						$output = isset( $match['format'] ) ? strftime( $match['format'], strtotime( $output ) ) : CRM_Utils_Date::customFormat( $output );
-					} elseif ( ( $field['data_type'] == 'String' ) || ( $field['data_type'] == 'Text' ) ) {
-						if ( preg_match( '/(?<len>\d+):(?<cw>chars|words):?(?<end>.*)/x' , $match['format'], $m ) ) {
-							if ( ( $m['cw'] == 'words' ) && ( $m['len'] < str_word_count($output) ) ) {
-								$output = implode( ' ', array_slice( explode( ' ', $output), 0, $m['len'] ) );
-								$output .= $m['end'];
-							} elseif ( $m['len'] < strlen($output) ) {
-								$output = substr( $output, 0, $m['len'] );
-								$output .= $m['end'];
-							}
-						}
 					} elseif ( $field['fk_entity'] == 'File' ) {
 						$output = Civicrm_Ux::in_basepage( function () use ( $output ) {
 							return htmlentities( civicrm_api3( 'Attachment', 'getvalue', [
@@ -197,11 +168,6 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 							          ' alt="' . ( $m['alt'] ? htmlentities( $m['alt'] ) : '" role="presentation' ) .
 							          '">';
 						}
-					} elseif ( preg_match( '/^img( : (?<w> \d+ %? ) x (?<h> \d+ %? ) | : alt= (?<alt>.*) | : [^:]* )* /x', $match['format'], $m ) ) {
-						$output = '<img src="' . $output . '"'
-							          . ( $m['w'] ? " width=\"${m['w']}\" height=\"${m['h']}\"" : '' ) .
-							          ' alt="' . ( $m['alt'] ? htmlentities( $m['alt'] ) : '" role="presentation' ) .
-							          '">';
 					} else {
 						if ( is_array( $output ) ) {
 							$output = implode( ', ', $output );
