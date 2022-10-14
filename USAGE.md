@@ -189,16 +189,6 @@ Limited format support is available:
 * Date fields can have their format specified with the same format as [CiviCRM's date display](https://docs.civicrm.org/user/en/latest/initial-set-up/dates/), e.g. `[api4:start_date:%B %E, %Y]`
 * File upload fields can be output as images with width, height, and alt text specified, e.g. `[api4:My_Custom_Field_Group.Image_Upload:img:800x300:alt=A picture]`
 * A line break tag can be output with fields only when they contain data with `:br`, e.g. `[api4:My_Custom_Field_Group.Optional_Field:br]`
-<<<<<<< HEAD
-* Conditional display of fields has some support, using `[api4:display_name|sort_name]` syntax, which will return the `display_name` if defined, then the `sort_name` if defined. Formatting options cannot be applied conditionally, so this should only be used for the same content type (i.e. don't mix text/images in results, as this may apply invalid formatting options).
-
-Arbitrary API queries are supported using json syntax, as per CiviCRM's API query formatting. Square brackets, double quotes and single quotes should be escaped to their html encodings. For example:
-```
-[ux_cv_api4_get entity=Event json='{&quotwhere&quot : &#91 &#91 &quotid&quot, &quot=&quot, 10 &#93 &#93}' ]
-```
-=======
-* Text fields may be truncated at a certain length using `[api4:title:100:chars:...]`, where the `chars` may be replaced by `words`. The `...` argument is optional, and will be added to the end of truncated strings.
->>>>>>> bd30e3d (Implemented text formatting for API text fields)
 
 ### CiviCRM API trouble-shooting
 
