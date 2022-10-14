@@ -170,7 +170,7 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 							if ( ( $m['cw'] == 'words' ) && ( $m['len'] < str_word_count($output) ) ) {
 								$output = implode( ' ', array_slice( explode( ' ', $output), 0, $m['len'] ) );
 								$output .= $m['end'];
-							} elseif ( $m['len'] < strlen($output) ) {
+							} elseif (  $m['cw'] != 'words' && $m['len'] < strlen($output) ) {
 								$output = substr( $output, 0, $m['len'] );
 								$output .= $m['end'];
 							}
