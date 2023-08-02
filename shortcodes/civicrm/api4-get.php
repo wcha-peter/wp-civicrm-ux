@@ -74,7 +74,7 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 					$params['orderBy'][ $sort ] = $dir;
 					break;
 				case 'json':
-					$unescaped = str_replace(array('&#91','&#93', '&quot', '&#34', '&#39'), array('[',']','"','"',"'"), $v);
+					$unescaped = str_replace(array('&#91','&#93', '&quot', '&#34', '&#39', '&lt', '&gt'), array('[',']','"','"',"'","<",">"), $v);
 					$json_array = json_decode($unescaped, true);
 					foreach ( $json_array as $json_key => $json_value ) {
 						if (array_key_exists($json_key, $params)) {
