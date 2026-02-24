@@ -172,6 +172,14 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 
 			$results = civicrm_api4( $atts['entity'], 'get', $params );
 
+			// Output a no results message from a template part
+			if ( $results->count() < 1 ) {
+				// Buffer the output
+				ob_start();
+				civicrm_ux_load_template_part( 'shortcode', 'no-results' );
+				return ob_get_clean();
+			}
+
 			foreach ( $results as $result ) {
 				$output = preg_replace_callback( $output_regex, function ( $match ) use ( $result, $fields ) {
 					$output = $result[ $match['field'] ] ?? '';
@@ -196,21 +204,18 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 						}
 					} elseif ( ( $field['fk_entity'] ?? NULL ) == 'File' ) {
 						try {
-							$output = Civicrm_Ux::in_basepage(function () use ($output) {
-								return htmlentities(civicrm_api3('Attachment', 'getvalue', [
-									'id'     => (int) $output,
-									'return' => 'url',
-								]));
-							});
+							$output = $this->getAttachmentUrl( $output );
 
-							if (preg_match('/^img( : (?<w> \d+ %? ) x (?<h> \d+ %? ) | : alt= (?<alt>.*) | : [^:]* )* /x', $match['format'], $m)) {
+							if ( $output && preg_match( '/^img( : (?<w> \d+ %? ) x (?<h> \d+ %? ) | : alt= (?<alt>.*) | : [^:]* )* /x', $match['format'], $m ) ) {
 								$output = '<img src="' . $output . '"'
-									. ($m['w'] ? " width=\"${m['w']}\" height=\"${m['h']}\"" : '') .
-									' alt="' . ($m['alt'] ? htmlentities($m['alt']) : '" role="presentation') .
-									'">';
+								          . ( !empty($m['w']) ? " width=\"${m['w']}\" height=\"${m['h']}\"" : '' ) .
+								          ' alt="' . ( !empty($m['alt']) ? htmlentities( $m['alt'] ) : '" role="presentation' ) .
+								          '">';
 							}
-						} catch (\Exception $e) {
-							$output = '';
+						} catch (\CRM_Core_Exception $e) {
+							\Civi::log()->error( 'WordPress Post ID: ' . get_the_ID() . '; CiviCRM APIv4 Shortcode: ' . $this->get_shortcode_name() . '; Params: ' . json_encode( $params ) . ';' );
+							\Civi::log()->error( $e->getMessage() );
+							\Civi::log()->error( $e->getTraceAsString() );
 						}
 					} elseif ( preg_match( '/^img( : (?<w> \d+ %? ) x (?<h> \d+ %? ) | : alt= (?<alt>.*) | : [^:]* )* /x', $match['format'], $m ) ) {
 						$output = '<img src="' . $output . '"'
@@ -250,7 +255,29 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 			\Civi::log()
 			     ->error( $e->getTraceAsString() );
 
+			// Buffer the output
+			ob_start();
+			civicrm_ux_load_template_part( 'shortcode', 'no-results' );
+			return ob_get_clean();
+		}
+	}
+
+	protected function getAttachmentUrl( int $id ): string {
+		$file = \Civi\Api4\File::get(FALSE)
+		                       ->addWhere('id', '=', $id)
+		                       ->execute()
+		                       ->first();
+
+		if(!$file) {
 			return '';
 		}
+
+		$fileHash = \CRM_Core_BAO_File::generateFileHash(NULL, $file['id']);
+
+		$url = Civicrm_Ux::in_basepage(
+			fn() => CRM_Utils_System::url( 'civicrm/file', [ 'reset' => 1, 'id' => $file['id'], 'fcs' => $fileHash ] )
+		);
+
+		return $url;
 	}
 }
