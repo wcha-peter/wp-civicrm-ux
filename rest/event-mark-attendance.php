@@ -1,5 +1,10 @@
 <?php
 
+// Disallow direct access
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use \Sabre\VObject;
 
 /**
@@ -38,9 +43,9 @@ class Civicrm_Ux_REST_Event_Mark_Attendance extends Abstract_Civicrm_Ux_REST {
 		civicrm_initialize();
 
         try {
-            $participant_id = $data['pid'];
-            $event_id = $data['eid'];
-            $attendance = $data['attendance'] == 1 ? $data['a_stat'] : $data['na_stat'];
+            $participant_id = absint($data['pid']);
+            $event_id = absint($data['eid']);
+            $attendance = absint($data['attendance']) == 1 ? absint($data['a_stat']) : absint($data['na_stat']);
             
             $result = civicrm_api3('FormProcessor', 'mark_event_attendance', [
                 'pid' => $participant_id,
@@ -59,5 +64,21 @@ class Civicrm_Ux_REST_Event_Mark_Attendance extends Abstract_Civicrm_Ux_REST {
         }
 
         return $response;
+	}
+
+	/**
+	 * Check permissions to mark event attendance
+	 * Verifies user is logged in and has permission to register for events
+	 *
+	 * @return bool
+	 */
+	public function check_permissions() {
+		if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
+			return false;
+		}
+
+		// Verify user has CiviCRM permission to register for events
+		civicrm_initialize();
+		return CRM_Core_Permission::check( 'register for events' );
 	}
 }

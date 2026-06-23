@@ -2,6 +2,12 @@
 /**
  * Class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get
  */
+
+// Disallow direct access
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcode {
 
 	/**
@@ -54,7 +60,8 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 			// Replace ?<parameter> with the escaped value of the matching URL parameter.
 			[$v, $default] = explode('??', $v, 2) + [ null, null ];
 			$v = preg_replace_callback( '{\? (?<value> [[:alnum:]_-]+ )}x', function ( $matches ) use( $default ) {
-				return str_replace( [ '%' ], [ '\%' ], CRM_Core_DAO::escapeString( empty( $_GET[ $matches['value'] ] ) ? $default : $_GET[ $matches['value'] ] ) );
+				$get_value = isset($_GET[ $matches['value'] ]) ? sanitize_text_field($_GET[ $matches['value'] ]) : $default;
+				return str_replace( [ '%' ], [ '\%' ], CRM_Core_DAO::escapeString( $get_value ) );
 			}, $v );
 			$k = preg_replace( '/-(\w+)/', ':$1', $k );
 
@@ -132,7 +139,7 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 
 		$output_regex = '/ (?: ( \[ ) | ( {{ ) | ( \|\| ) ) api4: (?<field> [^][[:space:]:{}]+ (?::(?:label|value|name|id))?) (?: : (?<format> [^][{}]+ ) )? (?(1) \] | (?(2) (?: }}) | (?: \|\|) ) ) /sx';
 
-		if ( preg_match_all( $output_regex, $content, $match ) ) {
+		if ( !is_null($content) && preg_match_all( $output_regex, $content, $match ) ) {
 			$params['select'] = array_values( $match['field'] );
 		}
 
@@ -181,7 +188,7 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 			}
 
 			foreach ( $results as $result ) {
-				$output = preg_replace_callback( $output_regex, function ( $match ) use ( $result, $fields ) {
+				$output = preg_replace_callback( $output_regex, function ( $match ) use ( $result, $fields, $params ) {
 					$output = $result[ $match['field'] ] ?? '';
 
 					if ( ! $output ) {
@@ -208,7 +215,7 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 
 							if ( $output && preg_match( '/^img( : (?<w> \d+ %? ) x (?<h> \d+ %? ) | : alt= (?<alt>.*) | : [^:]* )* /x', $match['format'], $m ) ) {
 								$output = '<img src="' . $output . '"'
-								          . ( !empty($m['w']) ? " width=\"${m['w']}\" height=\"${m['h']}\"" : '' ) .
+								          . ( !empty($m['w']) ? " width=\"{$m['w']}\" height=\"{$m['h']}\"" : '' ) .
 								          ' alt="' . ( !empty($m['alt']) ? htmlentities( $m['alt'] ) : '" role="presentation' ) .
 								          '">';
 							}
@@ -274,7 +281,7 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 
 		$fileHash = \CRM_Core_BAO_File::generateFileHash(NULL, $file['id']);
 
-		$url = Civicrm_Ux::in_basepage(
+		$url = (string) Civicrm_Ux::in_basepage(
 			fn() => CRM_Utils_System::url( 'civicrm/file', [ 'reset' => 1, 'id' => $file['id'], 'fcs' => $fileHash ] )
 		);
 

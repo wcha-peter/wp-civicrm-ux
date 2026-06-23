@@ -1,5 +1,10 @@
 <?php
 
+// Disallow direct access
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use \Sabre\VObject;
 
 /**
@@ -38,7 +43,7 @@ class Civicrm_Ux_REST_Event_Cancel_Registration extends Abstract_Civicrm_Ux_REST
 		civicrm_initialize();
 
         try {
-            $event_id = $data['eid'];
+            $event_id = absint($data['eid']);
             
             $result = civicrm_api3('FormProcessor', 'cancel_event_registration', [
                 'eid' => $event_id,
@@ -55,5 +60,21 @@ class Civicrm_Ux_REST_Event_Cancel_Registration extends Abstract_Civicrm_Ux_REST
         }
 
         return $response;
+	}
+
+	/**
+	 * Check permissions to cancel event registration
+	 * Verifies user is logged in and has permission to register for events
+	 *
+	 * @return bool
+	 */
+	public function check_permissions() {
+		if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
+			return false;
+		}
+
+		// Verify user has CiviCRM permission to register for events
+		civicrm_initialize();
+		return CRM_Core_Permission::check( 'register for events' );
 	}
 }
