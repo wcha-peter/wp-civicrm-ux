@@ -81,6 +81,17 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 					}
 					$params['orderBy'][ $sort ] = $dir;
 					break;
+				case 'json':
+					$unescaped = str_replace(array('&#91','&#93', '&quot', '&#34', '&#39', '&lt', '&gt'), array('[',']','"','"',"'","<",">"), $v);
+					$json_array = json_decode($unescaped, true);
+					foreach ( $json_array as $json_key => $json_value ) {
+						if (array_key_exists($json_key, $params)) {
+							$params[$json_key] = array_merge($params[$json_key], $json_value);
+						} else {
+							$params[$json_key] = $json_value;
+						}
+					}
+					break;
 				default:
 					[ $op, $value ] = str_contains($v, ':') ? explode( ':', $v, 2 ) : [ '=', $v ];
 
@@ -119,7 +130,7 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 
 		$match = [];
 
-		$output_regex = '/ (?: ( \[ ) | ( {{ ) ) api4: (?<field> [^][[:space:]:{}]+ (?::(?:label|value|name|id))?) (?: : (?<format> [^][{}]+ ) )? (?(1) \] | }} ) /sx';
+		$output_regex = '/ (?: ( \[ ) | ( {{ ) | ( \|\| ) ) api4: (?<field> [^][[:space:]:{}]+ (?::(?:label|value|name|id))?) (?: : (?<format> [^][{}]+ ) )? (?(1) \] | (?(2) (?: }}) | (?: \|\|) ) ) /sx';
 
 		if ( preg_match_all( $output_regex, $content, $match ) ) {
 			$params['select'] = array_values( $match['field'] );
@@ -191,6 +202,11 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 						} catch (\Exception $e) {
 							$output = '';
 						}
+					} elseif ( preg_match( '/^img( : (?<w> \d+ %? ) x (?<h> \d+ %? ) | : alt= (?<alt>.*) | : [^:]* )* /x', $match['format'], $m ) ) {
+						$output = '<img src="' . $output . '"'
+							          . ( $m['w'] ? " width=\"${m['w']}\" height=\"${m['h']}\"" : '' ) .
+							          ' alt="' . ( $m['alt'] ? htmlentities( $m['alt'] ) : '" role="presentation' ) .
+							          '">';
 					} else {
 						if ( is_array( $output ) ) {
 							$output = implode( ', ', $output );
