@@ -302,7 +302,7 @@ class Civicrm_Ux {
 	}
 
 	public function civicrm_init() {
-		civicrm_initialize();
+		// civicrm_initialize();
 	}
 
 	/**

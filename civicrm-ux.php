@@ -39,13 +39,6 @@ if ( !defined( 'TEC_HIDE_UPSELL' ) ) {
 
 require_once WP_CIVICRM_UX_PLUGIN_PATH . 'vendor/autoload.php';
 
-// Include the upgrader class
-require_once WP_CIVICRM_UX_PLUGIN_PATH . 'includes/class-civicrm-ux-upgrader.php';
-
-// Initialize the upgrader
-$upgrader = new Civicrm_Ux_Upgrader( __FILE__ );
-$upgrader->init();
-
 /**
  * The code that runs during plugin activation.
  * This action is documented in includes/class-civicrm-ux-activator.php

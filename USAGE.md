@@ -22,13 +22,6 @@ You can include additional parameters in the fullcalendar shortcode to limit the
 - *`redirect_after_login`* - optionally provide a URL to redirect to after login. Useful if you have a custom Event registration page, instead of the default CiviCRM event registration page.
 - *`img_src_field`*: the field name the path to the event image. This must be a custom text field for CiviCRM events, containing a path relative to the WordPress uploads directory, 
 
-### Removed parameters
-
-1. REMOVED: `image_id_field`.  
-   Nonfunctional parameter to use a CiviCRM custom file field as the event image.
-2. REMOVED: `upload`
-   Override to image upload location. Generally only useful in combination with `image_id_field` on CiviCRM installations with unusual data directories. 
-
 ## CiviCRM APIv4 Shortcode
 
 The CiviCRM APIv4 is directly accessible using the `[ux_cv_api4_get]` WordPress shortcode. You can use the CiviCRM APIv4 Explorer to understand how to query CiviCRM using the APIv4.
@@ -250,6 +243,11 @@ Example usage:
 ```
 
 
+Arbitrary API queries are supported using json syntax, as per CiviCRM's API query formatting. Square brackets, double quotes and single quotes should be escaped to their html encodings. For example:
+```
+[ux_cv_api4_get entity=Event json='{&quotwhere&quot : &#91 &#91 &quotid&quot, &quot=&quot, 10 &#93 &#93}' ]
+```
+
 ### CiviCRM API trouble-shooting
 
 If the CiviCRM API shortcode is not evaluating and returning a **blank** result, check the CiviCRM log file for errors. An error message along with a CiviCRM backtrace will be shown.
@@ -339,25 +337,21 @@ The event listing displays the start date, the end date, the event name, the reg
 
 ## Event Cancel Registration Shortcodes
 
-These shortcodes will enable users to cancel their registration for an event. It requires a FormProcessor to handle the participant status update. This comes with the advantage of customisation for the FormProcessor, so you can do things like handle associated Contributions, trigger an email to be sent, and generate Activities.
+These shortcodes enable users to cancel their registration for an event. This requires the [Form Processor](https://lab.civicrm.org/extensions/form-processor) CiviCRM extension to handle the participant status update. You can then handle associated Contributions, trigger an email to be sent, and generate Activities using the Form Processor. It is recommended to import the one provided in the [data directory](https://github.com/agileware/wp-civicrm-ux/tree/master/data) of this plugin as a starting point.
 
 The following shortcodes *must* be used together:
 
 - *`[ux_event_cancelregistration]`* provides a WordPress nonce for authentication
 - *`[ux_event_cancelregistration_button text="My Button Text" eventid={{api4:id}}]`* outputs a button with the given text for the given event id. It also outputs a confirmation modal dialog for the given event id. You could provide the id, for example, via `[ux_cv_api4_get]` as shown here, which is perfect for generated listings, or hardcode it in for specific event pages. It will not render for events the current logged in user does not have an active registration for.
 
-You will also need to enable the Form Processor CiviCRM extension, and create a `cancel_event_registration` form processor. It is recommended to import the one provided in the data directory of this extension as a starting point.
-
 ## Event Mark Attendance Shortcodes
 
-These shortcodes provide a way to optionally allow users to mark their own attendance for an event. It uses a FormProcessor to handle the participant status update.
+These shortcodes provide a way to optionally allow users to mark their own attendance for an event. This requires the [Form Processor](https://lab.civicrm.org/extensions/form-processor) CiviCRM extension to handle the participant status update. It is recommended to import the one provided in the [data directory](https://github.com/agileware/wp-civicrm-ux/tree/master/data) of this plugin as a starting point.
 
 The following shortcodes *must* be used together:
 
 - *`[ux_event_markattendance]`* provides a WordPress nonce for authentication
 - *`[ux_event_markattendance_button text="My Button Text" eventid={{api4:id}} attended_status={{status_id}} not_attended_status={{status_id}}]`* outputs a button with the given text for the given event id. It also outputs a confirmation modal dialog for the given event id. You could provide the id, for example, via `[ux_cv_api4_get]` as shown here, which is perfect for generated listings, or hardcode it in for specific event pages. You can customise which status (by ID) to set when the user has selected they have attended using `attended_status`, and which to set when they have not attended using `not_attended_status`. The button will not render for events the current logged in user does not have an active registration for, and has not passed.
-
-You will also need to enable the Form Processor CiviCRM extension, and create a `mark_event_attendance` form processor. It is recommended to import the one provided in the data directory of this extension as a starting point.
 
 ## Custom Button Shortcode
 
@@ -396,29 +390,38 @@ Outputs a table row of membership data. Checks for the logged in contact's cid, 
 [ux_membership_row membership_type="1,5" membership_status="Current,Grace,Expired" expiration_offset="30 days" renewal_url="/civicrm/contribute/transact/?reset=1&id=1"]
 ```
 
+### Use template parts to override output
+
+Membership Shortcodes support the use of [Template Parts](https://developer.wordpress.org/themes/templates/template-parts/) to override the output, so you can customise, style and precisely control how the information is shown on your website.
+
+The following Template Parts are supported:
+
+- membership
+- membership-row
+- membership-no-results
+- membership-no-access
+
+To override the output of the shortcode when there are no membership records to display, create a Template Part file by:
+
+1. Copy the template file: ```wp-civicrm-ux/templates/shortcode/shortcode-membership-no-results.php```
+2. Create the new file: ```wp-content/themes/theme-name/template-parts/shortcode/shortcode-membership-no-results.php```
+3. Customise as required
+
 ### Renewing a membership inherited by relationship
 
 When linking to a CiviCRM Contribution Page to renew a membership inherited by relationship, it is important to be aware that the contact must have a permissioned relationship with the related contact. This enables the contact to renew the membership on behalf of the primary member, typically an organisation. If there is no permissioned relationship then a new organisation will be entered and the unsupervised duplicate matching rules for organisations will be used. A new membership instead of a membership renewal may also be created. [See the CiviCRM documentation for more details](https://docs.civicrm.org/user/en/latest/membership/defining-memberships)
 
-### Deprecated
+### Deprecated shortcodes
 *The following shortcodes are marked for deprecation in a future release in favour of the above shortcodes.*
 
-1. DEPRECATED: `[ux_membership_expiry]`  
-   Return a HTML tag with the membership expiry date of the login user.
-2. DEPRECATED: `[ux_membership_id]`  
-   Return the membership id of the login user.
-3. DEPRECATED: `[ux_membership_join_url]`  
-   Return the join form URL. The URL can be configured in the settings page.
-4. DEPRECATED: `[ux_membership_renewal_date]`  
-   Return the renewal date of the membership for the login user
-5. DEPRECATED: `[ux_membership_renewal_url]`  
-   Return the renewal form URL. The URL can be configured in the settings page.
-6. DEPRECATED: `[ux_membership_status]`  
-   Return the membership status of the login user.
-7. DEPRECATED: `[ux_membership_summary]`  
-   Return the membership summary of the login user.
-8. DEPRECATED: `[ux_membership_type]`  
-   Return the membership type of the login user. 
+1. `[ux_membership_expiry]`  - Return a HTML tag with the membership expiry date of the login user.
+2. `[ux_membership_id]` - Return the membership id of the login user.
+3. `[ux_membership_join_url]` - Return the join form URL. The URL can be configured in the settings page.
+4. `[ux_membership_renewal_date]` - Return the renewal date of the membership for the login user
+5. `[ux_membership_renewal_url]` - Return the renewal form URL. The URL can be configured in the settings page.
+6. `[ux_membership_status]` - Return the membership status of the login user.
+7. `[ux_membership_summary]` - Return the membership summary of the login user.
+8. `[ux_membership_type]` - Return the membership type of the login user. 
 
 ## CiviCRM Data Processor Shortcode
 
@@ -428,7 +431,7 @@ This shortcode will output a [CiviCRM Data Processor](https://lab.civicrm.org/ex
  - **dpid**: Data Processor ID
  - **limit**: the limit of result default is 0 (no limit)
  - **sort**: the order of result, either: asc (ascending) or desc (descending)
- - **autopop_user_id**: return the logged-in user ID and passas a parameter to the Data Processor. Define the parameter name, like *contact_id*
+ - **autopop_user_id**: return the logged-in user ID and pass as a parameter to the Data Processor. Define the parameter name, like *contact_id*
  - **hide_fields**: comma separated list of fields to be excluded from the output.
  - **css_id**: CSS ID to assign to the table.
 
