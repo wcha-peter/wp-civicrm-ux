@@ -9,22 +9,23 @@
  * Plugin Name:       WP CiviCRM UX
  * Plugin URI:        https://github.com/agileware/wp-civicrm-ux
  * Description:       A better user experience for integrating WordPress and CiviCRM
- * Version:           1.31.4
- * Requires at least: 5.8
- * Requires PHP:      7.4
+ * Version:           1.32.7
+ * Requires at least: 6.5
+ * Tested up to:      7.0
+ * Requires PHP:      8.1
  * Requires Plugins:  civicrm
  * Author:            Agileware
  * Author URI:        https://agileware.com.au/
- * License:           GPL-2.0+
+ * License:           GPLv2 or later
  * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain:       civicrm-ux
  * Domain Path:       /languages
  * GitHub Plugin URI: agileware/wp-civicrm-ux
  */
 
-// If this file is called directly, abort.
-if ( ! defined( 'WPINC' ) ) {
-	die;
+// Disallow direct access
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
 }
 
 define( 'WP_CIVICRM_UX_PLUGIN_NAME', basename(plugin_dir_path(__FILE__ )) );

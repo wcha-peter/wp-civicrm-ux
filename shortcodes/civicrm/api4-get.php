@@ -2,6 +2,12 @@
 /**
  * Class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get
  */
+
+// Disallow direct access
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcode {
 
 	/**
@@ -27,6 +33,20 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 				'entity' => 'Contact',
 			];
 
+		// CiviCRM accepts an entity name in any case, but the tests below are
+		// case-sensitive, so "contact" would otherwise skip both the permission
+		// check and the email/address/phone join, and "event" would skip the
+		// my_events and participant_status_id handling. Canonicalise just the two
+		// names treated specially here; any other entity is passed through as
+		// written, since names like ContributionRecur cannot be derived by case
+		// folding alone.
+		foreach ( [ 'Contact', 'Event' ] as $known_entity ) {
+			if ( strcasecmp( $atts['entity'], $known_entity ) === 0 ) {
+				$atts['entity'] = $known_entity;
+				break;
+			}
+		}
+
 		// If "id" attribute exists but isn't an integer, replace it with a GET parameter with that name.
 		if ( array_key_exists( 'id', $atts ) &&
 			 !filter_var( $atts['id'], FILTER_VALIDATE_INT, [ 'options' => [ 'min-range' => 1 ] ] ) &&
@@ -38,8 +58,9 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 			}
 		}
 
-		// default checkPermissions as FALSE, assume that security is handled by appropriate API usage.
-		$params = [ 'checkPermissions' => FALSE ];
+		// Default checkPermissions based on entity type; can be overridden via the
+		// check_permissions attribute.
+		$params = [ 'checkPermissions' => ( $atts['entity'] === 'Contact' ) ];
 
 		// cache results by default
 		$cache_results = true;
@@ -54,7 +75,8 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 			// Replace ?<parameter> with the escaped value of the matching URL parameter.
 			[$v, $default] = explode('??', $v, 2) + [ null, null ];
 			$v = preg_replace_callback( '{\? (?<value> [[:alnum:]_-]+ )}x', function ( $matches ) use( $default ) {
-				return str_replace( [ '%' ], [ '\%' ], CRM_Core_DAO::escapeString( empty( $_GET[ $matches['value'] ] ) ? $default : $_GET[ $matches['value'] ] ) );
+				$get_value = isset($_GET[ $matches['value'] ]) ? sanitize_text_field($_GET[ $matches['value'] ]) : $default;
+				return str_replace( [ '%' ], [ '\%' ], CRM_Core_DAO::escapeString( $get_value ) );
 			}, $v );
 			$k = preg_replace( '/-(\w+)/', ':$1', $k );
 
@@ -108,13 +130,18 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 						case 'my_events':
 							// Only get events for the current logged in user
 							if ($value && $atts['entity'] == 'Event') {
-								$params['join'][] = ['Participant AS participant', 'LEFT', ['participant.event_id', '=', 'id']];
-								$params['where'][] = ['participant.contact_id', '=', CRM_Core_Session::singleton()->getLoggedInContactID()];
+								// Cast to int so a visitor with no CiviCRM contact filters on 0,
+								// which matches no participant. This clause is the only thing
+								// keeping one member's registrations private, so it should not
+								// rest on how the API happens to treat a NULL comparison.
+								$contact_id = (int) CRM_Core_Session::singleton()->getLoggedInContactID();
+								$this->add_participant_join( $params );
+								$params['where'][] = ['participant.contact_id', '=', $contact_id];
 							}
 							break;
 						case 'participant_status_id':
 							if ($value && $atts['entity'] == 'Event') {
-								$params['join'][] = ['Participant AS participant', 'LEFT', ['participant.event_id', '=', 'id']];
+								$this->add_participant_join( $params );
 								$params['where'][] = ['participant.status_id', $op, $value];
 							}
 							break;
@@ -132,7 +159,7 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 
 		$output_regex = '/ (?: ( \[ ) | ( {{ ) | ( \|\| ) ) api4: (?<field> [^][[:space:]:{}]+ (?::(?:label|value|name|id))?) (?: : (?<format> [^][{}]+ ) )? (?(1) \] | (?(2) (?: }}) | (?: \|\|) ) ) /sx';
 
-		if ( preg_match_all( $output_regex, $content, $match ) ) {
+		if ( !is_null($content) && preg_match_all( $output_regex, $content, $match ) ) {
 			$params['select'] = array_values( $match['field'] );
 		}
 
@@ -155,7 +182,16 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 				$post_revision = '';
 			}
 
-			$trkey = $this->get_shortcode_name() . '__' . $post_revision . md5( $atts['entity'] . ':get:' . json_encode( $params ) );
+			// Results fetched with permission checks vary by viewer, so the cache key
+			// must vary too - otherwise the first permitted visitor warms a site-wide
+			// transient that every later visitor, anonymous ones included, is served.
+			// Both identities are used because either can carry the permissions that
+			// shaped the result. Unchecked calls keep their original key, so public
+			// queries stay shared and existing caches remain valid.
+			$cache_identity = empty( $params['checkPermissions'] ) ? '' :
+				':user:' . get_current_user_id() . ':contact:' . (int) CRM_Core_Session::singleton()->getLoggedInContactID();
+
+			$trkey = $this->get_shortcode_name() . '__' . $post_revision . md5( $atts['entity'] . ':get:' . json_encode( $params ) . $cache_identity );
 
 			$all = !empty($_GET['reset']) || !$cache_results ? FALSE : get_transient( $trkey );
 
@@ -172,8 +208,16 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 
 			$results = civicrm_api4( $atts['entity'], 'get', $params );
 
+			// Output a no results message from a template part
+			if ( $results->count() < 1 ) {
+				// Buffer the output
+				ob_start();
+				civicrm_ux_load_template_part( 'shortcode', 'no-results' );
+				return ob_get_clean();
+			}
+
 			foreach ( $results as $result ) {
-				$output = preg_replace_callback( $output_regex, function ( $match ) use ( $result, $fields ) {
+				$output = preg_replace_callback( $output_regex, function ( $match ) use ( $result, $fields, $params ) {
 					$output = $result[ $match['field'] ] ?? '';
 
 					if ( ! $output ) {
@@ -186,21 +230,18 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 						$output = isset( $match['format'] ) ? Civicrm_Ux::getInstance()->strftime( $match['format'], strtotime( $output ) ) : CRM_Utils_Date::customFormat( $output );
 					} elseif ( ( $field['fk_entity'] ?? NULL ) == 'File' ) {
 						try {
-							$output = Civicrm_Ux::in_basepage(function () use ($output) {
-								return htmlentities(civicrm_api3('Attachment', 'getvalue', [
-									'id'     => (int) $output,
-									'return' => 'url',
-								]));
-							});
+							$output = $this->getAttachmentUrl( $output );
 
-							if (preg_match('/^img( : (?<w> \d+ %? ) x (?<h> \d+ %? ) | : alt= (?<alt>.*) | : [^:]* )* /x', $match['format'], $m)) {
+							if ( $output && preg_match( '/^img( : (?<w> \d+ %? ) x (?<h> \d+ %? ) | : alt= (?<alt>.*) | : [^:]* )* /x', $match['format'], $m ) ) {
 								$output = '<img src="' . $output . '"'
-									. ($m['w'] ? " width=\"${m['w']}\" height=\"${m['h']}\"" : '') .
-									' alt="' . ($m['alt'] ? htmlentities($m['alt']) : '" role="presentation') .
-									'">';
+								          . ( !empty($m['w']) ? " width=\"{$m['w']}\" height=\"{$m['h']}\"" : '' ) .
+								          ' alt="' . ( !empty($m['alt']) ? htmlentities( $m['alt'] ) : '" role="presentation' ) .
+								          '">';
 							}
-						} catch (\Exception $e) {
-							$output = '';
+						} catch (\CRM_Core_Exception $e) {
+							\Civi::log()->error( 'WordPress Post ID: ' . get_the_ID() . '; CiviCRM APIv4 Shortcode: ' . $this->get_shortcode_name() . '; Params: ' . json_encode( $params ) . ';' );
+							\Civi::log()->error( $e->getMessage() );
+							\Civi::log()->error( $e->getTraceAsString() );
 						}
 					} elseif ( preg_match( '/^img( : (?<w> \d+ %? ) x (?<h> \d+ %? ) | : alt= (?<alt>.*) | : [^:]* )* /x', $match['format'], $m ) ) {
 						$output = '<img src="' . $output . '"'
@@ -240,7 +281,45 @@ class Civicrm_Ux_Shortcode_CiviCRM_Api4_Get extends Abstract_Civicrm_Ux_Shortcod
 			\Civi::log()
 			     ->error( $e->getTraceAsString() );
 
+			// Buffer the output
+			ob_start();
+			civicrm_ux_load_template_part( 'shortcode', 'no-results' );
+			return ob_get_clean();
+		}
+	}
+
+	/**
+	 * Join Participant for the my_events and participant_status_id attributes.
+	 *
+	 * Both attributes need the same alias, so the join is added at most once -
+	 * repeating it would emit a duplicate alias when they are used together.
+	 *
+	 * @param array $params APIv4 params, modified in place.
+	 */
+	protected function add_participant_join( array &$params ) {
+		$join = [ 'Participant AS participant', 'LEFT', [ 'participant.event_id', '=', 'id' ] ];
+
+		if ( ! in_array( $join, $params['join'] ?? [], TRUE ) ) {
+			$params['join'][] = $join;
+		}
+	}
+
+	protected function getAttachmentUrl( int $id ): string {
+		$file = \Civi\Api4\File::get(FALSE)
+		                       ->addWhere('id', '=', $id)
+		                       ->execute()
+		                       ->first();
+
+		if(!$file) {
 			return '';
 		}
+
+		$fileHash = \CRM_Core_BAO_File::generateFileHash(NULL, $file['id']);
+
+		$url = (string) Civicrm_Ux::in_basepage(
+			fn() => CRM_Utils_System::url( 'civicrm/file', [ 'reset' => 1, 'id' => $file['id'], 'fcs' => $fileHash ] )
+		);
+
+		return $url;
 	}
 }

@@ -6,6 +6,11 @@
  * To customise, copy this file into your theme and make changes as needed.
  */
 
+// Disallow direct access
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 // Get the default date format from WordPress settings
 $dateFormat = get_option('date_format');
 
@@ -45,19 +50,20 @@ foreach ($args['memberships'] as $membership) {
 ?>
 
     <tr>
-        <td><?php echo $membership['contact_owner.display_name'] ?? $membership['contact.display_name']; ?></td>
-        <td><?php echo $membership['membership_type_id:label']; ?></td>
-        <td><?php echo $membership['status_id:label']; ?></td>
-        <td><?php echo $formattedEndDate; ?></td>
+        <td><?= esc_html($membership['contact_owner.display_name'] ?? $membership['contact.display_name']); ?></td>
+        <td><?= esc_html($membership['membership_type_id:label']); ?></td>
+        <td><?= esc_html($membership['status_id:label']); ?></td>
+        <td><?= esc_html($formattedEndDate); ?></td>
         <td>
-            <?php if ($renewalUrl && (($expiration_offset_date && $endDate->getTimestamp() <= $expiration_offset_date) || $endDate->getTimestamp() <= time())) { ?>
-                <a href="<?php echo esc_url($renewalUrl); ?>" target="_blank">Renew this membership</a>
-        </td>
-    <?php } else { ?>
-        No renewal required</td>
-    <?php } ?>
+            <?php if ($renewalUrl && !empty($membership['end_date']) && (($expiration_offset_date && $endDate->getTimestamp() <= $expiration_offset_date) || $endDate->getTimestamp() <= time())) { ?>
+                <div class="wp-block-button">
+                    <a href="<?= esc_url($renewalUrl); ?>" target="_blank" class="wp-block-button__link wp-element-button">Renew this membership</a>
+                </div>
+            </td>
+            <?php } else { ?>
+            <p>No renewal required<p></td>
+            <?php } ?>
     </tr>
-
 <?php
 }
 ?>

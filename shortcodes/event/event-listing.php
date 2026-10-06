@@ -1,5 +1,9 @@
 <?php
 
+// Disallow direct access
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 use Civi\Api4\Event;
 
@@ -30,6 +34,10 @@ class Civicrm_Ux_Shortcode_Event_Listing extends Abstract_Civicrm_Ux_Shortcode {
       'type' => '',
       'days' => '',
     ], $atts, $tag);
+
+    // Sanitize inputs
+    $mod_atts['type'] = sanitize_text_field($mod_atts['type']);
+    $mod_atts['days'] = absint($mod_atts['days']);
 
     try {
       $results = Event::get(FALSE)
@@ -113,16 +121,25 @@ class Civicrm_Ux_Shortcode_Event_Listing extends Abstract_Civicrm_Ux_Shortcode {
     return $output;
   }
 
-  private function get_event_register_link_html(string $event_id, string $text = 'Register now') {
+  /**
+   * $text is nullable because the columns it comes from are.
+   *
+   * civicrm_event.registration_link_text and .title are both `varchar(255) NULL` with no
+   * default. CiviCRM's own event form always populates them, but an event created through
+   * the API - by an import, a sync, or another extension - leaves them NULL. Declaring the
+   * parameter as a non-nullable string made that a TypeError rather than a missing label,
+   * taking down the whole page the shortcode was on.
+   */
+  private function get_event_register_link_html(string $event_id, ?string $text = NULL) {
     // URLs must be absolute as this shortcode may be used by the au.com.agileware.evaluatewpshortcode extension
     $url = CRM_Utils_System::url('civicrm/event/register', ['id' => $event_id],TRUE,NULL,TRUE,TRUE);
-    return '<a target=_blank href="' . $url . '">' . $text . '</a>';
+    return '<a target=_blank href="' . $url . '">' . ( $text ?: 'Register now' ) . '</a>';
   }
 
-  private function get_event_info_link_html(string $event_id, string $text = 'More information') {
+  private function get_event_info_link_html(string $event_id, ?string $text = NULL) {
     // URLs must be absolute as this shortcode may be used by the au.com.agileware.evaluatewpshortcode extension
     $url = CRM_Utils_System::url('civicrm/event/info', ['id' => $event_id],TRUE,NULL,TRUE,TRUE);
-    return '<a target=_blank href="' . $url . '">' . $text . '</a>';
+    return '<a target=_blank href="' . $url . '">' . ( $text ?: 'More information' ) . '</a>';
   }
 
 }

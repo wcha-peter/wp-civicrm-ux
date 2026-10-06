@@ -13,6 +13,11 @@
  * @subpackage Civicrm_Ux/includes
  */
 
+// Disallow direct access
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * The core plugin class.
  *
@@ -116,6 +121,8 @@ class Civicrm_Ux {
 		$this->loader->add_action( 'init', $this, 'civicrm_init' );
 
 		$this->loader->add_action( 'civicrm_config', $this, 'civicrm_config' );
+
+		$this->loader->add_action( 'pre_do_shortcode_tag', $this, 'civicrm_pre_shortcode_filter', 10, 3 );
 
 		$this->loader->add_action( 'do_shortcode_tag', $this, 'civicrm_shortcode_filter', 10, 3 );
 
@@ -309,9 +316,110 @@ class Civicrm_Ux {
 	 * Actions to take during CiviCRM config hook.
 	 */
 	public function civicrm_config() {
-		if ( ( strpos( $_GET['q'] ?? '', 'civicrm/ajax' ) === 0 ) && ! defined( 'DOING_AJAX' ) ) {
+		if ( ( strpos( sanitize_text_field($_GET['q'] ?? ''), 'civicrm/ajax' ) === 0 ) && ! defined( 'DOING_AJAX' ) ) {
 			define( 'DOING_AJAX', TRUE );
 		}
+	}
+
+	public function get_event_status_message($event)
+	{
+
+		// Get the WordPress site's configured timezone
+		// We assume CiviCRM's site timezone matches the WordPress timezone.
+		$wp_timezone = wp_timezone(); // Returns a DateTimeZone object
+
+		// Create $now using the WordPress timezone.
+		$now = new \DateTime('now', $wp_timezone);
+
+		// Helper function to safely parse the date string directly into the local timezone.
+		$getDateInLocalTime = function ($dateString) use ($wp_timezone) {
+			if (empty($dateString)) {
+				return null;
+			}
+			// Parse the ambiguous date string and explicitly assign the local timezone.
+			// Because this string is already in the local timezone.
+			return new \DateTime($dateString, $wp_timezone);
+		};
+
+		$registration_start_date = $getDateInLocalTime($event['registration_start_date']);
+		$registration_end_date = $getDateInLocalTime($event['registration_end_date']);
+
+		// Check if registration has not opened yet
+		// Compare $now (Local Time) < start_date (Local Time)
+		if ($registration_start_date && $now < $registration_start_date) {
+			// Use the original string for formatting
+			$formattedDate = \CRM_Utils_Date::customFormat($event['registration_start_date']);
+			return sprintf('Registration for this event opens on %s', $formattedDate);
+		}
+
+		// Check if registration has already ended
+		// Compare $now (Local Time) > end_date (Local Time)
+		if ($registration_end_date && $now > $registration_end_date) {
+			// Use the original string for formatting
+			$formattedDate = \CRM_Utils_Date::customFormat($event['registration_end_date']);
+			return sprintf('Registration for this event ended on %s', $formattedDate);
+		}
+
+		// Check if the event is full (and waitlist is not enabled)
+		$maxParticipants = !empty($event['max_participants']) ? (int) $event['max_participants'] : 0;
+		if ($maxParticipants > 0 && $event['participant_count'] >= $maxParticipants && empty($event['has_waitlist'])) {
+			return $event['event_full_text'] ?? 'This event is currently full.';
+		}
+
+		// If none of the above, registration is open or not enabled
+		return '';
+	}
+
+	public function civicrm_pre_shortcode_filter( $return, $tag, $attr ) {
+		// Prevent the [civicrm component="event" action="register"] shortcode from
+		// rendering when the registrations are full and waitlist is not enabled.
+		if ( 'civicrm' !== $tag || empty( $attr['component'] ) || $attr['component'] !== 'event' || empty( $attr['action'] ) || $attr['action'] !== 'register' ) {
+			return false;
+		}
+
+		// Get the Event ID from the URL query string
+		if (empty($_REQUEST['id']) || !is_numeric($_REQUEST['id'])) {
+			return false; // No ID found, let CiviCRM handle the error
+		}
+		$eventId = absint($_REQUEST['id']);
+
+		$message = '';
+
+		try {
+			// Get the current status of the event
+			$event = \Civi\Api4\Event::get(FALSE)
+									->addWhere('id', '=', $eventId)
+									->addSelect(
+										'id',
+										'registration_start_date',
+										'registration_end_date',
+										'max_participants',
+										'has_waitlist',
+										'is_online_registration',
+										'COUNT(participant.id) AS participant_count', // Fetches the current number of participants
+										'event_full_text'
+									)
+									->addJoin('Participant AS participant', 'LEFT', ['participant.event_id', '=', 'id'], ['participant.status_id.is_counted', '=', TRUE])
+									->execute()
+									->single();
+			
+			if ( !$event || !$event['id'] ) {
+				return false;
+			}
+
+			$message = $this->get_event_status_message( $event );			
+		} catch (\Exception $e) {
+			return false;
+		}
+
+		// Render the custom message. 
+		// Support customisation of the message when online registration is not enabled (by default returns nothing).
+		if ( !$event['is_online_registration'] || !empty( $message ) ) {
+			return civicrm_ux_get_template_part( 'shortcode', 'civicrm-custom-event-register', array_merge( $attr, ['message' => $message, 'event' => $event] ));
+		}
+
+		// Let the shortcode render normally
+		return false;
 	}
 
 	public function civicrm_shortcode_filter( $output, $tag, $attr ) {
@@ -371,6 +479,7 @@ class Civicrm_Ux {
 	 * @param Closure $callback
 	 *
 	 * @return any
+	 * @throws Throwable
 	 */
 	public static function in_basepage( Closure $callback ) {
 		global $post;
@@ -378,9 +487,17 @@ class Civicrm_Ux {
 
 		$post = get_page_by_path( strtolower( CRM_Core_Config::singleton()->wpBasePage ?? 'civicrm' ) ) ?? $post;
 
-		$return = $callback();
+		try {
+			$return = $callback();
+		} catch(Throwable $e) {
+			$return = $e;
+		}
 
 		$post = $actual_post;
+
+		if($return instanceof Throwable) {
+			throw $return;
+		}
 
 		return $return;
 	}

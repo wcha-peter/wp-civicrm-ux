@@ -1,5 +1,10 @@
 <?php
 
+// Disallow direct access
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use \Sabre\VObject;
 
 /**
@@ -38,7 +43,7 @@ class Civicrm_Ux_REST_Event_Cancel_Registration extends Abstract_Civicrm_Ux_REST
 		civicrm_initialize();
 
         try {
-            $event_id = $data['eid'];
+            $event_id = absint($data['eid']);
             
             $result = civicrm_api3('FormProcessor', 'cancel_event_registration', [
                 'eid' => $event_id,
@@ -55,5 +60,23 @@ class Civicrm_Ux_REST_Event_Cancel_Registration extends Abstract_Civicrm_Ux_REST
         }
 
         return $response;
+	}
+
+	/**
+	 * Check permissions to cancel event registration
+	 * Verifies user is logged in and has permission to register for events
+	 *
+	 * @return bool
+	 */
+	public function check_permissions() {
+		if ( ! current_user_can( 'register_for_events' ) ) {
+			return new WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to cancel this event registration.', 'civicrm-ux' ),
+				[ 'status' => 403 ]
+			);
+		}
+
+		return true;
 	}
 }

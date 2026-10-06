@@ -1,0 +1,34 @@
+<?php
+/**
+ * Default template for customising the [civicrm component="event" action="register"] shortcodes.
+ * 
+ * Alters default rendering of the shortcode when the CiviCRM Event is full and waitlist is not enabled.
+ * Replicates the CiviCRM messages container.
+ * 
+ * 
+ * To customise, copy this file into your theme and make changes as needed.
+ */
+
+// Disallow direct access
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+$message    = isset($args['message']) ? $args['message'] : "";
+$event      = isset($args['event']) ? $args['event'] : [];
+
+if ( empty($message) ) {
+    // Return nothing if the message is somehow empty
+    return '';
+}
+?>
+
+
+<div id="crm-container" class="crm-container">
+    <div id="crm-main-content-wrapper">
+        <div class="messages status no-popup alert" data-options="null">
+            <i aria-hidden="true" class="crm-i fa-info-circle"></i><span class="msg-title"></span>
+            <span class="msg-text"><?= esc_html($message); ?></span>
+        </div>
+    </div>
+</div>

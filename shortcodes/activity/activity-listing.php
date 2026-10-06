@@ -13,6 +13,12 @@
  *
  * Class Civicrm_Ux_Shortcode_Activity_Listing
  */
+
+// Disallow direct access
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class Civicrm_Ux_Shortcode_Activity_Listing extends Abstract_Civicrm_Ux_Shortcode {
 
 	/**
@@ -57,6 +63,14 @@ class Civicrm_Ux_Shortcode_Activity_Listing extends Abstract_Civicrm_Ux_Shortcod
 			'format'          => 'default',
 			'sort'            => 'activity_date_time DESC',
 		], $atts, $tag );
+
+		// Sanitize inputs
+		$mod_atts['type'] = sanitize_text_field($mod_atts['type']);
+		$mod_atts['limit'] = absint($mod_atts['limit']);
+		$mod_atts['relationship-id'] = absint($mod_atts['relationship-id']);
+		$mod_atts['field'] = sanitize_text_field($mod_atts['field']);
+		$mod_atts['format'] = sanitize_text_field($mod_atts['format']);
+		$mod_atts['sort'] = sanitize_text_field($mod_atts['sort']);
 
 		$cid = [ CRM_Core_Session::singleton()->getLoggedInContactID() ];
 		if ( ! empty( $mod_atts['relationship-id'] ) ) {
@@ -176,21 +190,47 @@ class Civicrm_Ux_Shortcode_Activity_Listing extends Abstract_Civicrm_Ux_Shortcod
 			}
 			$html = '<thead><tr>' . $header_html . '</tr></thead>';
 			foreach ( $info as $data ) {
-				$title = $data['subject'];
-				$org   = end( $data['target_contact_name'] );
+				$title = $data['subject'] ?? '';
+				$org   = self::get_target_contact_name( $data );
 				$html  .= $this->get_table_row( $title, $org, $data, $header );
 			}
 
 			return '<table>' . $html . '</table>';
 		} else {
 			foreach ( $info as $data ) {
-				$title = $data['subject'];
-				$org   = end( $data['target_contact_name'] );
+				$title = $data['subject'] ?? '';
+				$org   = self::get_target_contact_name( $data );
 				$html  .= $this->get_item_html( $title, $org, $data, $header );
 			}
 
 			return '<div class="civicrm-activities-wrap">' . $html . '</div>';
 		}
+	}
+
+	/**
+	 * Name of an activity's target contact, or '' when the activity has no target.
+	 *
+	 * Activity APIv3 builds target_contact_name only while walking the activity's actual
+	 * target contacts, so an activity with none simply has no such key - unlike
+	 * target_contact_id, which is initialised to an empty array either way. Reading the
+	 * missing key straight into end() passed NULL to a parameter typed array, which is a
+	 * TypeError, so one targetless activity fatalled the whole listing.
+	 *
+	 * Verified against the 6.16.5 source and live on 6.10: the key is present, holding
+	 * [contactId => displayName], whenever a target exists.
+	 *
+	 * @param array $data One activity from the API result.
+	 *
+	 * @return string
+	 */
+	private static function get_target_contact_name( array $data ) {
+		$names = $data['target_contact_name'] ?? NULL;
+
+		if ( is_array( $names ) && ! empty( $names ) ) {
+			return (string) end( $names );
+		}
+
+		return is_string( $names ) ? $names : '';
 	}
 
 	/**
@@ -220,7 +260,9 @@ class Civicrm_Ux_Shortcode_Activity_Listing extends Abstract_Civicrm_Ux_Shortcod
 
 		$html .= '<div class="civicrm-activities-item">' .
 		         '<div class="civicrm-activities-header">' .
-		         '<h2>' . htmlentities($org) . ': ' . htmlentities($title) . '</h2>' .
+		         // The target contact's name is often unavailable (see get_target_contact_name),
+		         // so the separator is only emitted when there is actually something to separate.
+		         '<h2>' . ( $org !== '' ? htmlentities($org) . ': ' : '' ) . htmlentities($title) . '</h2>' .
 		         '</div>' .
 		         '<div class="civicrm-activities-information">' .
 		         $fields_html .

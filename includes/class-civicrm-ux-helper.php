@@ -10,6 +10,11 @@
  * @subpackage Civicrm_Ux/includes
  */
 
+// Disallow direct access
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Helper class
  *
@@ -40,7 +45,7 @@ class Civicrm_Ux_Helper {
 	}
 
 	public function check_hash_in_option( string $hash, string $option ) {
-		return $hash == get_option( $option );
+		return hash_equals( (string) get_option( $option ), $hash );
 	}
 
 	public function ends_with( $string, $needle ) {
