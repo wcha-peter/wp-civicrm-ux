@@ -55,11 +55,11 @@ class Civicrm_Ux_Shortcode_Campaign_End_date extends Abstract_Civicrm_Ux_Shortco
 			$result = [];
 		}
 
-		if ( empty( $result ) || $result['is_error'] ) {
+		if ( empty( $result ) || ! empty( $result['is_error'] ) ) {
 			return 'Campaign not found.';
 		}
 
-		$end_date = $result['end_date'];
+		$end_date = $result['end_date'] ?? null;
 		if ( empty( $end_date ) ) {
 			return '';
 		}

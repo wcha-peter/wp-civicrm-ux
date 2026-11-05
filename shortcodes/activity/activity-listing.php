@@ -121,7 +121,7 @@ class Civicrm_Ux_Shortcode_Activity_Listing extends Abstract_Civicrm_Ux_Shortcod
 				} catch ( CiviCRM_API3_Exception $e ) {
 					$result = [];
 				}
-				if ( ! $result['is_error'] ) {
+				if ( ! empty( $result ) && empty( $result['is_error'] ) ) {
 					$header[ $field ] = ucfirst( $result['label'] );
 				}
 			} else {

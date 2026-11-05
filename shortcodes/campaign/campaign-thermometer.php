@@ -62,12 +62,12 @@ class Civicrm_Ux_Shortcode_Campaign_Thermometer extends Abstract_Civicrm_Ux_Shor
 			$result = [];
 		}
 
-		if ( empty( $result ) || $result['is_error'] ) {
+		if ( empty( $result ) || ! empty( $result['is_error'] ) ) {
 			return 'Campaign not found.';
 		}
 
 		$sum                   = (float) Civicrm_Ux_Campaign_Utils::sum_from_contributions( $result['api.Contribution.get']['values'] );
-		$goal_amount           = (float) $result['goal_revenue'];
+		$goal_amount           = (float) ( $result['goal_revenue'] ?? 0 );
 		$calculated_percentage = empty( $result['goal_revenue'] ) ? 100 : round( $sum / $goal_amount * 100 );
 		$percentage            = ( $calculated_percentage <= 100 ? $calculated_percentage : '100' ) . '%';
 

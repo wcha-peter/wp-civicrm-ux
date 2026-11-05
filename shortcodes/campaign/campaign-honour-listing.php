@@ -81,7 +81,7 @@ class Civicrm_Ux_Shortcode_Campaign_Honour_Listing extends Abstract_Civicrm_Ux_S
 			$result = [];
 		}
 
-		if ( empty( $result ) || $result['is_error'] ) {
+		if ( empty( $result ) || ! empty( $result['is_error'] ) ) {
 			return 'Campaign not found.';
 		}
 

@@ -59,7 +59,7 @@ class Civicrm_Ux_Shortcode_Campaign_Total_Raised extends Abstract_Civicrm_Ux_Sho
 			$result = [];
 		}
 
-		if ( empty( $result ) || $result['is_error'] ) {
+		if ( empty( $result ) || ! empty( $result['is_error'] ) ) {
 			return 'Campaign not found.';
 		}
 

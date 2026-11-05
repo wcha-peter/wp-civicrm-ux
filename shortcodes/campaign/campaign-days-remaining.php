@@ -58,11 +58,11 @@ class Civicrm_Ux_Shortcode_Campaign_Days_Remaining extends Abstract_Civicrm_Ux_S
 			$result = [];
 		}
 
-		if ( empty( $result ) || $result['is_error'] ) {
+		if ( empty( $result ) || ! empty( $result['is_error'] ) ) {
 			return 'Campaign not found.';
 		}
 
-		$end_date      = $result['end_date'];
+		$end_date      = $result['end_date'] ?? null;
 		$day_remaining = Civicrm_Ux_Campaign_Utils::get_remaining_day( $end_date );
 
 		if ( $day_remaining === 0 ) {

@@ -89,7 +89,7 @@ class Civicrm_Ux_Shortcode_Contact_value extends Abstract_Civicrm_Ux_Shortcode {
 			$labels = [];
 		}
 
-		if ( $labels['is_error'] ) {
+		if ( empty( $labels ) || ! empty( $labels['is_error'] ) ) {
 			return $this->no_value( $result ) ? $mod_atts['default'] : $this->get_display_values( $result );
 		}
 		if ( $labels['values'] ) {

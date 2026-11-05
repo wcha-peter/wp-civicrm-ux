@@ -111,7 +111,7 @@ class Civicrm_Ux_Event_Utils {
 		}
 
 		// Exit if error
-		if ( $result['is_error'] == 1 ) {
+		if ( empty( $result ) || ! empty( $result['is_error'] ) ) {
 			return 'ERROR';
 		}
 

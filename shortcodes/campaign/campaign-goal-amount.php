@@ -54,11 +54,11 @@ class Civicrm_Ux_Shortcode_Campaign_Goal_Amount extends Abstract_Civicrm_Ux_Shor
 			$result = [];
 		}
 
-		if ( empty( $result ) || $result['is_error'] ) {
+		if ( empty( $result ) || ! empty( $result['is_error'] ) ) {
 			return 'Campaign not found.';
 		}
 
-		$goal_amount = (float) $result['goal_revenue'];
+		$goal_amount = (float) ( $result['goal_revenue'] ?? 0 );
 
 		return CRM_Utils_Money::format($goal_amount);
 	}

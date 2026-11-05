@@ -60,7 +60,7 @@ class Civicrm_Ux_Shortcode_Campaign_Number_Contributions extends Abstract_Civicr
 			$result = [];
 		}
 
-		if ( empty( $result ) || $result['is_error'] ) {
+		if ( empty( $result ) || ! empty( $result['is_error'] ) ) {
 			return 'Campaign not found.';
 		}
 
